@@ -97,7 +97,7 @@ func TestUpdatePerformance(t *testing.T) {
 			// --------------------------
 			// 更新测试阶段（核心日志保留）
 			// --------------------------
-			const updateTotalTimes = 1000
+			const updateTotalTimes = 10
 			t.Logf("关键字数量=%d, L=%d, 更新轮次=%d", indexNum[fileIndex], L, updateTotalTimes)
 
 			// OurScheme 更新测试
@@ -105,18 +105,34 @@ func TestUpdatePerformance(t *testing.T) {
 			for updateRound := 0; updateRound < updateTotalTimes; updateRound++ {
 				kw := strconv.Itoa(keywords[rand.Intn(len(keywords))])
 				start := time.Now()
-				_ = ours.Update(kw, generateRandomDocIDsBigInt(5))
+				_ = ours.Update(kw, generateRandomDocIDsBigInt(10))
 				totalOursDur += time.Since(start).Nanoseconds()
 			}
 			avgOursDur := totalOursDur / updateTotalTimes
 			t.Logf("OurScheme 平均更新耗时=%d ns", avgOursDur)
 
 			// FB_DSSE 更新测试
+			t.Logf("开始 FB_DSSE 更新测试...")
 			var totalFBDur int64 = 0
 			for updateRound := 0; updateRound < updateTotalTimes; updateRound++ {
 				kw := strconv.Itoa(keywords[rand.Intn(len(keywords))])
+				docIDs := generateRandomDocIDsBigInt(10) // 生成长度为10的数组
+
+				if len(docIDs) == 0 {
+					t.Errorf("FB_DSSE 第 %d 次更新: 文档ID为空", updateRound+1)
+					continue
+				}
+
 				start := time.Now()
-				_ = fbDsseParams.UpdateBigInt(kw, generateRandomDocIDsBigInt(5)[0])
+
+				// 遍历数组中的每个元素，分别调用 UpdateBigInt
+				for _, docID := range docIDs {
+					if err := fbDsseParams.UpdateBigInt(kw, docID); err != nil {
+						t.Errorf("FB_DSSE 第 %d 次更新失败 (docID=%v): %v", updateRound+1, docID, err)
+						continue
+					}
+				}
+
 				totalFBDur += time.Since(start).Nanoseconds()
 			}
 			avgFBDur := totalFBDur / updateTotalTimes
@@ -177,7 +193,7 @@ func generateRandomDocIDsBigInt(count int) []*big.Int {
 	for i := 0; i < count; i++ {
 		// 步骤1：用math/rand生成int64范围的随机数（0 ~ 1e9-1）
 		//randInt64 := int64(rand.Intn(1e9))
-		randInt64 := int64(rand.Intn(1e6))
+		randInt64 := int64(rand.Intn(1e9))
 		// 步骤2：将int64转为big.Int类型
 		randBigInt := big.NewInt(randInt64)
 		// 步骤3：确保文档ID非零（若随机数为0则加1，否则保持原数）
