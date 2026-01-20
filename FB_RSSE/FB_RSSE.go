@@ -259,7 +259,7 @@ func (sp *SystemParameters) BuildDBMock(invertedIndex map[string][]int) (map[str
 
 			// 在位图中设置文档ID对应的位（核心临时操作）
 			for _, docID := range docIDs {
-				info.bs.SetBit(info.bs, docID%1e6, 1)
+				info.bs.SetBit(info.bs, docID%1e6, 1) //取模以减小索引构建需要耗费的内存
 			}
 			tempDB[tempCode] = info
 		}

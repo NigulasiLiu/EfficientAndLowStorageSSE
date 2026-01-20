@@ -97,15 +97,16 @@ func TestUpdatePerformance(t *testing.T) {
 			// --------------------------
 			// 更新测试阶段（核心日志保留）
 			// --------------------------
-			const updateTotalTimes = 10
+			const updateTotalTimes = 200
 			t.Logf("关键字数量=%d, L=%d, 更新轮次=%d", indexNum[fileIndex], L, updateTotalTimes)
 
 			// OurScheme 更新测试
 			var totalOursDur int64 = 0
 			for updateRound := 0; updateRound < updateTotalTimes; updateRound++ {
 				kw := strconv.Itoa(keywords[rand.Intn(len(keywords))])
+				docIDs := generateRandomDocIDsBigInt(50)
 				start := time.Now()
-				_ = ours.Update(kw, generateRandomDocIDsBigInt(10))
+				_ = ours.Update(kw, docIDs)
 				totalOursDur += time.Since(start).Nanoseconds()
 			}
 			avgOursDur := totalOursDur / updateTotalTimes
@@ -116,7 +117,7 @@ func TestUpdatePerformance(t *testing.T) {
 			var totalFBDur int64 = 0
 			for updateRound := 0; updateRound < updateTotalTimes; updateRound++ {
 				kw := strconv.Itoa(keywords[rand.Intn(len(keywords))])
-				docIDs := generateRandomDocIDsBigInt(10) // 生成长度为10的数组
+				docIDs := generateRandomDocIDsBigInt(50)
 
 				if len(docIDs) == 0 {
 					t.Errorf("FB_DSSE 第 %d 次更新: 文档ID为空", updateRound+1)
