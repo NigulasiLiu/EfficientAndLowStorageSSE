@@ -63,8 +63,11 @@ func Setup(L int) *OurScheme {
 	}
 }
 
-// BuildIndex 构建倒排索引
+// ---------------------------------------------------------
+// 核心模块 2: 索引构建 (BuildIndex)
+// ---------------------------------------------------------
 func (sp *OurScheme) BuildIndex(invertedIndex map[string][]int, keywords []string) error {
+	// 3. 构建 VH-RSSE 分区结构 (Partitioning)
 	currentGroup := []int{}      // 当前分区的文件 ID
 	currentKlist := []string{}   // 当前分区的关键词
 	clusterFlist := [][]int{}    // 所有分区的文件 ID
