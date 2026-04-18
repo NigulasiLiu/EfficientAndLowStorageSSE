@@ -21,8 +21,9 @@ func RunComparison() error {
 	indexNum := []int{5000, 10000, 15000, 20000, 25000}
 	ranges := []int{600, 1200, 1800, 2400, 3000, 3600, 4200, 4800}
 	LValues := []int{6424}
-	k := 999999
-	resultCounts := 200
+	// Keep query attempts at hundred/thousand level for practical runtime.
+	k := 1000
+	resultCounts := 100
 	resultsDir := filepath.Join("results", "mhrq")
 	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 		return err
@@ -92,6 +93,9 @@ func RunComparison() error {
 				_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Search] m=%d range=%d (%d/%d) start\n", nowStamp(), indexNum[fileIndex], r, rIdx+1, len(ranges)))
 				validCount := 0
 				for i := 0; i < k; i++ {
+					if (i+1)%100 == 0 {
+						fmt.Printf("[MHRQ Comparison] Progress %d%% - search m=%d range=%d loop=%d/%d valid=%d\n", rangeProgress, indexNum[fileIndex], r, i+1, k, validCount)
+					}
 					queryRange, rangeWidth := generateQueryRangeWithWidth(sortedKeywords, r)
 					startQuery := time.Now()
 					res, err := s.Search(queryRange[0], atoiSafe(queryRange[0]), atoiSafe(queryRange[1]))
