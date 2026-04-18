@@ -22,8 +22,7 @@ func RunComparison() error {
 	ranges := []int{600, 1200, 1800, 2400, 3000, 3600, 4200, 4800}
 	LValues := []int{6424}
 	// Keep query attempts at hundred/thousand level for practical runtime.
-	k := 1000
-	resultCounts := 100
+	k := 300
 	resultsDir := filepath.Join("results", "mhrq")
 	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 		return err
@@ -91,10 +90,9 @@ func RunComparison() error {
 				rangeProgress := int(float64(completedUnits) / float64(overallUnits) * 100)
 				fmt.Printf("[MHRQ Comparison] Progress %d%% - search m=%d range=%d (%d/%d)\n", rangeProgress, indexNum[fileIndex], r, rIdx+1, len(ranges))
 				_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Search] m=%d range=%d (%d/%d) start\n", nowStamp(), indexNum[fileIndex], r, rIdx+1, len(ranges)))
-				validCount := 0
 				for i := 0; i < k; i++ {
 					if (i+1)%100 == 0 {
-						fmt.Printf("[MHRQ Comparison] Progress %d%% - search m=%d range=%d loop=%d/%d valid=%d\n", rangeProgress, indexNum[fileIndex], r, i+1, k, validCount)
+						fmt.Printf("[MHRQ Comparison] Progress %d%% - search m=%d range=%d loop=%d/%d\n", rangeProgress, indexNum[fileIndex], r, i+1, k)
 					}
 					queryRange, rangeWidth := generateQueryRangeWithWidth(sortedKeywords, r)
 					startQuery := time.Now()
@@ -108,13 +106,9 @@ func RunComparison() error {
 						_, _ = writer.WriteString(fmt.Sprintf("search\t%d\t%d\t%d\t%d\t%d\t0\t%d\t%d\t0\n", len(sortedKeywords), rangeWidth, i+1, buildDuration, queryDuration, estimateStorageBytes(s), searchTokenCountByPseudoCode()))
 						continue
 					}
-					validCount++
 					_, _ = writer.WriteString(fmt.Sprintf("search\t%d\t%d\t%d\t%d\t%d\t0\t%d\t%d\t%d\n", len(sortedKeywords), rangeWidth, i+1, buildDuration, queryDuration, estimateStorageBytes(s), searchTokenCountByPseudoCode(), len(res)))
-					if validCount >= resultCounts {
-						break
-					}
 				}
-				_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Search] m=%d range=%d done valid=%d\n", nowStamp(), indexNum[fileIndex], r, validCount))
+				_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Search] m=%d range=%d done loops=%d\n", nowStamp(), indexNum[fileIndex], r, k))
 				_ = writer.Flush()
 				_ = progressW.Flush()
 			}
