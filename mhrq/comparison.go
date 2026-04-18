@@ -24,6 +24,8 @@ func RunComparison() error {
 	LValues := []int{6424}
 	// Keep query attempts at hundred/thousand level for practical runtime.
 	k := 300
+	// Cap build updates per dataset to keep memory/runtime manageable.
+	buildCap := 5000
 	resultsDir := filepath.Join("results", "mhrq")
 	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
 		return err
@@ -64,16 +66,26 @@ func RunComparison() error {
 			}
 			_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Build] m=%d start\n", nowStamp(), indexNum[fileIndex]))
 			start := time.Now()
+			updates := 0
+			buildStop := false
 			for _, keyword := range sortedKeywords {
 				for _, docID := range invertedIndex[keyword] {
 					_, err := s.Update(strconv.Itoa(docID), "add", keyword, docID)
 					if err != nil {
 						return err
 					}
+					updates++
+					if updates >= buildCap {
+						buildStop = true
+						break
+					}
+				}
+				if buildStop {
+					break
 				}
 			}
 			buildDuration := time.Since(start).Nanoseconds()
-			_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Build] m=%d done duration_ns=%d\n", nowStamp(), indexNum[fileIndex], buildDuration))
+			_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Build] m=%d done duration_ns=%d updates=%d cap=%d\n", nowStamp(), indexNum[fileIndex], buildDuration, updates, buildCap))
 
 			outPath := filepath.Join(resultsDir, fmt.Sprintf("mhrq_comparison_config1_m_%d.txt", indexNum[fileIndex]))
 			f, err := os.Create(outPath)
