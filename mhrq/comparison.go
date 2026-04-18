@@ -38,7 +38,10 @@ func RunComparison() error {
 	defer progressW.Flush()
 	_, _ = progressW.WriteString(fmt.Sprintf("[%s] [MHRQ-Comparison] start\n", nowStamp()))
 
+	totalDatasets := len(files)
 	for fileIndex, file := range files {
+		datasetProgress := int(float64(fileIndex) / float64(totalDatasets) * 100)
+		fmt.Printf("[MHRQ Comparison] Progress %d%% - loading dataset (%d/%d): %s\n", datasetProgress, fileIndex+1, totalDatasets, file)
 		resolved := resolveDatasetPath(file)
 		_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Dataset] loading %s (resolved=%s)\n", nowStamp(), file, resolved))
 		if _, err := os.Stat(resolved); err != nil {
@@ -82,6 +85,10 @@ func RunComparison() error {
 				return err
 			}
 			for rIdx, r := range ranges {
+				overallUnits := totalDatasets * len(ranges)
+				completedUnits := fileIndex*len(ranges) + rIdx
+				rangeProgress := int(float64(completedUnits) / float64(overallUnits) * 100)
+				fmt.Printf("[MHRQ Comparison] Progress %d%% - search m=%d range=%d (%d/%d)\n", rangeProgress, indexNum[fileIndex], r, rIdx+1, len(ranges))
 				_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Search] m=%d range=%d (%d/%d) start\n", nowStamp(), indexNum[fileIndex], r, rIdx+1, len(ranges)))
 				validCount := 0
 				for i := 0; i < k; i++ {
@@ -111,6 +118,7 @@ func RunComparison() error {
 			_ = f.Close()
 		}
 	}
+	fmt.Println("[MHRQ Comparison] Progress 100% - finished")
 	_, _ = progressW.WriteString(fmt.Sprintf("[%s] [MHRQ-Comparison] finished\n", nowStamp()))
 	return nil
 }
