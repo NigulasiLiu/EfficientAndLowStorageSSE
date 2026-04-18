@@ -15,17 +15,17 @@ func TestRunAllMHRQExperiments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("raw_experiment_csv", func(t *testing.T) {
-		if err := runMHRQExperimentCSV(); err != nil {
+	t.Run("raw_experiment_txt", func(t *testing.T) {
+		if err := runMHRQExperimentTXT(); err != nil {
 			t.Fatal(err)
 		}
 	})
 
-	t.Run("summary_csv", func(t *testing.T) {
+	t.Run("summary_txt", func(t *testing.T) {
 		input := map[string]string{
-			"mhrq": filepath.Join(outDir, "mhrq_metrics.csv"),
+			"mhrq": filepath.Join(outDir, "mhrq_metrics_config1.txt"),
 		}
-		output := filepath.Join(outDir, "summary_all_schemes.csv")
+		output := filepath.Join(outDir, "summary_all_schemes.txt")
 		if err := RunReportFromCSVs(input, output); err != nil {
 			t.Fatal(err)
 		}
@@ -34,6 +34,9 @@ func TestRunAllMHRQExperiments(t *testing.T) {
 	fmt.Println("MHRQ experiment pipeline completed successfully")
 }
 
-func runMHRQExperimentCSV() error {
-	return testWriteMHRQMetrics(filepath.Join("results", "mhrq", "mhrq_metrics.csv"))
+func runMHRQExperimentTXT() error {
+	return testWriteMHRQMetricsTXT(
+		filepath.Join("results", "mhrq", "mhrq_metrics_config1.txt"),
+		filepath.Join("results", "mhrq", "mhrq_experiment_progress.log"),
+	)
 }

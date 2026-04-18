@@ -2,10 +2,10 @@ package mhrq
 
 import (
 	"bufio"
-	"encoding/csv"
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,7 +27,8 @@ func sortKeywords(invertedIndex map[string][]int) []string {
 
 func loadInvertedIndex(filePath string) (map[string][]int, error) {
 	invertedIndex := make(map[string][]int)
-	file, err := os.Open(filePath)
+	resolvedPath := resolveDatasetPath(filePath)
+	file, err := os.Open(resolvedPath)
 	if err != nil {
 		return nil, fmt.Errorf("无法打开文件: %v", err)
 	}
@@ -84,8 +85,22 @@ func generateQueryRangeWithWidth(keywords []string, width int) ([2]string, int) 
 	return [2]string{strconv.Itoa(left), strconv.Itoa(left + width)}, width
 }
 
-func writeCSVHeader(w *csv.Writer) error {
-	return w.Write([]string{"phase", "dataset_keywords", "range_width", "iteration", "build_time_ns", "query_time_ns", "update_time_ns", "storage_bytes", "tokens", "results"})
+func writeTXTHeader(w *bufio.Writer) error {
+	_, err := w.WriteString("phase\tkeywords\trange_width\titeration\tduration_ns\ttokens\tresults\tstorage_bytes\n")
+	return err
+}
+
+func writeComparisonTXTHeader(w *bufio.Writer) error {
+	_, err := w.WriteString("phase\tdataset_keywords\trange_width\titeration\tbuild_time_ns\tquery_time_ns\tupdate_time_ns\tstorage_bytes\ttokens\tresults\n")
+	return err
+}
+
+func searchTokenCountByPseudoCode() int {
+	// Based on the provided MHRQ Search pseudo code:
+	// 1) Data user sends trapdoor to server.
+	// 2) Server sends result set (or ⊥) back to data user.
+	// => total sends per query = 2.
+	return 2
 }
 
 func estimateStorageBytes(s *Scheme) int {
@@ -102,4 +117,20 @@ func estimateStorageBytes(s *Scheme) int {
 		}
 	}
 	return bytes
+}
+
+func nowStamp() string { return time.Now().Format("2006-01-02 15:04:05") }
+
+func resolveDatasetPath(p string) string {
+	candidates := []string{
+		p,
+		filepath.Join("..", p),
+		filepath.Join("..", "..", p),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	return p
 }

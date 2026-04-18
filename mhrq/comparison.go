@@ -1,7 +1,7 @@
 package mhrq
 
 import (
-	"encoding/csv"
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,8 +16,9 @@ func RunComparison() error {
 		filepath.Join("dataset", "Gowalla_invertedIndex_new_10000.txt"),
 		filepath.Join("dataset", "Gowalla_invertedIndex_new_15000.txt"),
 		filepath.Join("dataset", "Gowalla_invertedIndex_new_20000.txt"),
+		filepath.Join("dataset", "Gowalla_invertedIndex_new_25000.txt"),
 	}
-	indexNum := []int{5000, 10000, 15000, 20000}
+	indexNum := []int{5000, 10000, 15000, 20000, 25000}
 	ranges := []int{600, 1200, 1800, 2400, 3000, 3600, 4200, 4800}
 	LValues := []int{6424}
 	k := 999999
@@ -27,7 +28,22 @@ func RunComparison() error {
 		return err
 	}
 
+	progressPath := filepath.Join(resultsDir, "mhrq_comparison_progress.log")
+	progressFile, err := os.Create(progressPath)
+	if err != nil {
+		return err
+	}
+	defer progressFile.Close()
+	progressW := bufio.NewWriter(progressFile)
+	defer progressW.Flush()
+	_, _ = progressW.WriteString(fmt.Sprintf("[%s] [MHRQ-Comparison] start\n", nowStamp()))
+
 	for fileIndex, file := range files {
+		resolved := resolveDatasetPath(file)
+		_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Dataset] loading %s (resolved=%s)\n", nowStamp(), file, resolved))
+		if _, err := os.Stat(resolved); err != nil {
+			return fmt.Errorf("dataset not found: %s", resolved)
+		}
 		invertedIndex, err := loadInvertedIndex(file)
 		if err != nil {
 			return fmt.Errorf("load %s: %w", file, err)
@@ -42,6 +58,7 @@ func RunComparison() error {
 			if err != nil {
 				return err
 			}
+			_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Build] m=%d start\n", nowStamp(), indexNum[fileIndex]))
 			start := time.Now()
 			for _, keyword := range sortedKeywords {
 				for _, docID := range invertedIndex[keyword] {
@@ -52,18 +69,20 @@ func RunComparison() error {
 				}
 			}
 			buildDuration := time.Since(start).Nanoseconds()
+			_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Build] m=%d done duration_ns=%d\n", nowStamp(), indexNum[fileIndex], buildDuration))
 
-			outPath := filepath.Join(resultsDir, fmt.Sprintf("comparison_result_m_%d_mhrq.csv", indexNum[fileIndex]))
+			outPath := filepath.Join(resultsDir, fmt.Sprintf("mhrq_comparison_config1_m_%d.txt", indexNum[fileIndex]))
 			f, err := os.Create(outPath)
 			if err != nil {
 				return err
 			}
-			writer := csv.NewWriter(f)
-			if err := writeCSVHeader(writer); err != nil {
+			writer := bufio.NewWriter(f)
+			if err := writeComparisonTXTHeader(writer); err != nil {
 				_ = f.Close()
 				return err
 			}
-			for _, r := range ranges {
+			for rIdx, r := range ranges {
+				_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Search] m=%d range=%d (%d/%d) start\n", nowStamp(), indexNum[fileIndex], r, rIdx+1, len(ranges)))
 				validCount := 0
 				for i := 0; i < k; i++ {
 					queryRange, rangeWidth := generateQueryRangeWithWidth(sortedKeywords, r)
@@ -75,20 +94,24 @@ func RunComparison() error {
 						return err
 					}
 					if len(res) == 0 {
-						_ = writer.Write([]string{"search", strconv.Itoa(len(sortedKeywords)), strconv.Itoa(rangeWidth), strconv.Itoa(i + 1), strconv.FormatInt(buildDuration, 10), strconv.FormatInt(queryDuration, 10), "0", strconv.Itoa(estimateStorageBytes(s)), "0", "0"})
+						_, _ = writer.WriteString(fmt.Sprintf("search\t%d\t%d\t%d\t%d\t%d\t0\t%d\t%d\t0\n", len(sortedKeywords), rangeWidth, i+1, buildDuration, queryDuration, estimateStorageBytes(s), searchTokenCountByPseudoCode()))
 						continue
 					}
 					validCount++
-					_ = writer.Write([]string{"search", strconv.Itoa(len(sortedKeywords)), strconv.Itoa(rangeWidth), strconv.Itoa(i + 1), strconv.FormatInt(buildDuration, 10), strconv.FormatInt(queryDuration, 10), "0", strconv.Itoa(estimateStorageBytes(s)), strconv.Itoa(2), strconv.Itoa(len(res))})
+					_, _ = writer.WriteString(fmt.Sprintf("search\t%d\t%d\t%d\t%d\t%d\t0\t%d\t%d\t%d\n", len(sortedKeywords), rangeWidth, i+1, buildDuration, queryDuration, estimateStorageBytes(s), searchTokenCountByPseudoCode(), len(res)))
 					if validCount >= resultCounts {
 						break
 					}
 				}
+				_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Search] m=%d range=%d done valid=%d\n", nowStamp(), indexNum[fileIndex], r, validCount))
+				_ = writer.Flush()
+				_ = progressW.Flush()
 			}
-			writer.Flush()
+			_ = writer.Flush()
 			_ = f.Close()
 		}
 	}
+	_, _ = progressW.WriteString(fmt.Sprintf("[%s] [MHRQ-Comparison] finished\n", nowStamp()))
 	return nil
 }
 
