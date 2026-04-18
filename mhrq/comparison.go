@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -114,7 +115,16 @@ func RunComparison() error {
 			}
 			_ = writer.Flush()
 			_ = f.Close()
+
+			// Explicitly release large per-run allocations.
+			s = nil
+			runtime.GC()
 		}
+
+		// Explicitly release dataset-level allocations.
+		invertedIndex = nil
+		sortedKeywords = nil
+		runtime.GC()
 	}
 	fmt.Println("[MHRQ Comparison] Progress 100% - finished")
 	_, _ = progressW.WriteString(fmt.Sprintf("[%s] [MHRQ-Comparison] finished\n", nowStamp()))
