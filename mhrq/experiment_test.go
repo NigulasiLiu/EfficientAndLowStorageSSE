@@ -84,13 +84,20 @@ func testWriteMHRQMetricsTXT(outPath, logPath string) error {
 
 		_, _ = logW.WriteString(fmt.Sprintf("[%s] [Search] dataset=%d start (ranges=%d)\n", nowStamp(), n, len(ranges)))
 		for rIdx, width := range ranges {
-			startSearch := time.Now()
-			res, err := s.Search("1", 1, width)
-			dur := time.Since(startSearch).Nanoseconds()
+			// startSearch := time.Now()
+			// res, err := s.Search("1", 1, width)
+			// dur := time.Since(startSearch).Nanoseconds()
+
+			// 修改为：
+			res, clientTimeNs, serverTimeNs, err := s.Search("1", 1, width)
+			dur := clientTimeNs + serverTimeNs // 或者保留原来的 time.Since
 			if err != nil {
 				return err
 			}
-			_, _ = metricsW.WriteString(fmt.Sprintf("search\t%d\t%d\t0\t%d\t%d\t%d\t%d\n", n, width, dur, searchTokenCountByPseudoCode(), len(res), estimateStorageBytes(s)))
+			// 修改写入格式以包含这两个新时间
+			_, _ = metricsW.WriteString(fmt.Sprintf("search\t%d\t%d\t0\t%d\t%d\t%d\t%d\t%d\t%d\n",
+				n, width, dur, searchTokenCountByPseudoCode(), len(res), estimateStorageBytes(s),
+				clientTimeNs, serverTimeNs)) // <--- 新增写入
 			_, _ = logW.WriteString(fmt.Sprintf("[%s] [Search] dataset=%d range=%d (%d/%d) done duration_ns=%d tokens=%d\n", nowStamp(), n, width, rIdx+1, len(ranges), dur, searchTokenCountByPseudoCode()))
 		}
 

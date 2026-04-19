@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 )
 
 // Scheme holds the state for MHRQ.
@@ -104,14 +105,24 @@ func (s *Scheme) Revoke() (*RevokeToken, error) {
 	return &RevokeToken{NewKPRF: newKey, MPrime: mPrime, MDPrime: mDPrime, Delta: delta, M3: m3, M4: m4}, nil
 }
 
-func (s *Scheme) Search(w string, a, b int) ([]SearchResult, error) {
+// 修改 Search 函数签名，增加 clientTimeNs 和 serverTimeNs
+func (s *Scheme) Search(w string, a, b int) ([]SearchResult, int64, int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	qhat := CRQ_TokenGen(a, b, s.n, s.setup.M1, s.setup.M2)
-	results := make([]SearchResult, 0)
-	currentToken := append([]byte{}, s.keywordToken(w)...)
+	var clientTimeNs, serverTimeNs int64
 
+	// --- 记录客户端耗时（Token 生成）---
+	startClient := time.Now()
+	qhat := CRQ_TokenGen(a, b, s.n, s.setup.M1, s.setup.M2)
+	currentToken := append([]byte{}, s.keywordToken(w)...)
+	clientTimeNs += time.Since(startClient).Nanoseconds()
+	// ------------------------------------
+
+	results := make([]SearchResult, 0)
+
+	// --- 记录服务端耗时（密态搜索）---
+	startServer := time.Now()
 	for i := len(s.edb[w]) - 1; i >= 0; i-- {
 		ct := s.edb[w][i]
 		if ct == nil {
@@ -124,13 +135,21 @@ func (s *Scheme) Search(w string, a, b int) ([]SearchResult, error) {
 		if ct.EncryptedP == nil {
 			continue
 		}
+
 		trace := RangeTrace(ct.EncryptedP, qhat)
+
 		if trace.Sign() < 0 {
-			results = append(results, SearchResult{ID: ct.ID, Keyword: ct.Keyword, Value: ct.Value, Matched: true, Trace: trace, CipherID: ct.ID})
+			results = append(results, SearchResult{
+				ID: ct.ID, Keyword: ct.Keyword, Value: ct.Value,
+				Matched: true, Trace: trace, CipherID: ct.ID,
+			})
 		}
 	}
+	serverTimeNs += time.Since(startServer).Nanoseconds()
+	// ------------------------------------
+
 	_ = currentToken
-	return results, nil
+	return results, clientTimeNs, serverTimeNs, nil
 }
 
 func keyUpdate(delta, token []byte) []byte {

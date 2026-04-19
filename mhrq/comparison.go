@@ -75,7 +75,8 @@ func RunComparison() error {
 						return err
 					}
 					updates++
-					if updates >= buildCap {
+					//if updates >= buildCap {
+					if updates >= indexNum[fileIndex] {
 						buildStop = true
 						break
 					}
@@ -108,18 +109,28 @@ func RunComparison() error {
 						fmt.Printf("[MHRQ Comparison] Progress %d%% - search m=%d range=%d loop=%d/%d\n", rangeProgress, indexNum[fileIndex], r, i+1, k)
 					}
 					queryRange, rangeWidth := generateQueryRangeWithWidth(sortedKeywords, r)
-					startQuery := time.Now()
-					res, err := s.Search(queryRange[0], atoiSafe(queryRange[0]), atoiSafe(queryRange[1]))
-					queryDuration := time.Since(startQuery).Nanoseconds()
+					//startQuery := time.Now()
+					//res, err := s.Search(queryRange[0], atoiSafe(queryRange[0]), atoiSafe(queryRange[1]))
+					//queryDuration := time.Since(startQuery).Nanoseconds()
+					// startQuery 已经不再需要了，总时间我们通过 clientTime + serverTime 来算（或者保留 startQuery 作为参考的总体墙钟时间）
+					res, clientTimeNs, serverTimeNs, err := s.Search(queryRange[0], atoiSafe(queryRange[0]), atoiSafe(queryRange[1]))
 					if err != nil {
 						_ = f.Close()
 						return err
 					}
+					queryDuration := clientTimeNs + serverTimeNs
 					if len(res) == 0 {
-						_, _ = writer.WriteString(fmt.Sprintf("search\t%d\t%d\t%d\t%d\t%d\t0\t%d\t%d\t0\n", len(sortedKeywords), rangeWidth, i+1, buildDuration, queryDuration, estimateStorageBytes(s), searchTokenCountByPseudoCode()))
+						// 增加最后两个 %d 占位符对应 clientTimeNs 和 serverTimeNs
+						_, _ = writer.WriteString(fmt.Sprintf("search\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t0\t%d\t%d\n",
+							len(sortedKeywords), rangeWidth, i+1, buildDuration, queryDuration,
+							estimateStorageBytes(s), searchTokenCountByPseudoCode(),
+							clientTimeNs, serverTimeNs)) // <--- 新增写入
 						continue
 					}
-					_, _ = writer.WriteString(fmt.Sprintf("search\t%d\t%d\t%d\t%d\t%d\t0\t%d\t%d\t%d\n", len(sortedKeywords), rangeWidth, i+1, buildDuration, queryDuration, estimateStorageBytes(s), searchTokenCountByPseudoCode(), len(res)))
+					_, _ = writer.WriteString(fmt.Sprintf("search\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+						len(sortedKeywords), rangeWidth, i+1, buildDuration, queryDuration,
+						estimateStorageBytes(s), searchTokenCountByPseudoCode(), len(res),
+						clientTimeNs, serverTimeNs)) // <--- 新增写入
 				}
 				_, _ = progressW.WriteString(fmt.Sprintf("[%s] [Search] m=%d range=%d done loops=%d\n", nowStamp(), indexNum[fileIndex], r, k))
 				_ = writer.Flush()
